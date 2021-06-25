@@ -44,32 +44,40 @@ client.query(LISTEN_VALID_PAYMENT_QUERY)
 client.query(LISTEN_INVALID_PAYMENT_QUERY)
 
 client.on("notification", async notification => {
-  const payload = JSON.parse(notification.payload)
+  try {
+    const payload = JSON.parse(notification.payload)
 
-  switch (notification.channel) {
-    case "valid_payment_received":
-      await processValidPayment(payload)
-      break
-    case "invalid_payment_received":
-      processInvalidPayment(payload)
-      break
+    switch (notification.channel) {
+      case "valid_payment_received":
+        await processValidPayment(payload)
+        break
+      case "invalid_payment_received":
+        processInvalidPayment(payload)
+        break
+    }
+  } catch (err) {
+    console.log(err)
+    console.log({
+      error: "An error has occured while receiving a notification.",
+    })
   }
 })
 
 const processValidPayment = async payload => {
-  // Send Zombit (payload.asset_name) to payload.address
-  console.log("VALID PAYMENT RECEIVED:", payload)
+  try {
+    // Send Zombit (payload.asset_name) to payload.address
+    console.log("VALID PAYMENT RECEIVED:", payload)
 
-  const param1 = payload
-    .map(payment => `ma_tx_out.name != '${payment.asset_name}'`)
-    .join(" and ")
+    const param1 = payload
+      .map(payment => `ma_tx_out.name != '${payment.asset_name}'`)
+      .join(" and ")
 
-  const param2 = payload
-    .map(payment => `name = '${payment.asset_name}'`)
-    .join(" or ")
+    const param2 = payload
+      .map(payment => `name = '${payment.asset_name}'`)
+      .join(" or ")
 
-  const result1 =
-    await client.query(`select tx.hash::text || '#' || tx_out.index as tx, encode(ma_tx_out.name, 'escape') as asset_name, tx_out.value::int from tx_out
+    const result1 =
+      await client.query(`select tx.hash::text || '#' || tx_out.index as tx, encode(ma_tx_out.name, 'escape') as asset_name, tx_out.value::int from tx_out
   inner join tx on tx.id = tx_out.tx_id
   inner join ma_tx_out on tx_out.id = ma_tx_out.tx_out_id
   left join tx_in on tx_out.tx_id = tx_in.tx_out_id and tx_out.index = tx_in.tx_out_index
@@ -78,237 +86,271 @@ const processValidPayment = async payload => {
     where (${param2}) and policy = '\\x${POLICY_ID}'
   );`)
 
-  const io = result1.rows.reduce((rv, x) => {
-    const tx = x.tx.substring(2)
-    ;(rv[`${tx},${x.value}`] = rv[`${tx},${x.value}`] || []).push(
-      `1 ${POLICY_ID}.${x.asset_name}`
-    )
-    return rv
-  }, {})
+    const io = result1.rows.reduce((rv, x) => {
+      const tx = x.tx.substring(2)
+      ;(rv[`${tx},${x.value}`] = rv[`${tx},${x.value}`] || []).push(
+        `1 ${POLICY_ID}.${x.asset_name}`
+      )
+      return rv
+    }, {})
 
-  const result2 =
-    await client.query(`select distinct on (tx.hash::text || '#' || tx_out.index) tx.hash::text || '#' || tx_out.index as tx, tx_out.value::int from tx_out
+    const result2 =
+      await client.query(`select distinct on (tx.hash::text || '#' || tx_out.index) tx.hash::text || '#' || tx_out.index as tx, tx_out.value::int from tx_out
   inner join tx on tx.id = tx_out.tx_id
   inner join ma_tx_out on tx_out.id = ma_tx_out.tx_out_id
   left join tx_in on tx_out.tx_id = tx_in.tx_out_id and tx_out.index = tx_in.tx_out_index
   where tx_in.tx_out_id is null and tx_out.address = 'addr_test1vpjhck8puveya5qgd4uxe4arjzahxf4c2rkkstvt38c285q40majy' and (${param2}) and policy = '\\x${POLICY_ID}';`)
-  result2.rows.forEach(row => {
-    const key = `${row.tx.substring(2)},${row.value}`
-    if (!Object.keys(io).includes(key)) {
-      io[key] = []
-    }
-  })
+    result2.rows.forEach(row => {
+      const key = `${row.tx.substring(2)},${row.value}`
+      if (!Object.keys(io).includes(key)) {
+        io[key] = []
+      }
+    })
 
-  const inputs = Object.keys(io).map(key => {
-    const values = key.split(",")
-    return [values[0], parseInt(values[1])]
-  })
-  const outputsToUs = Object.values(io).filter(value => value.length !== 0)
-  const outputsToThem = payload.map(payment => {
-    return [`1 ${POLICY_ID}.${payment.asset_name}`]
-  })
+    const inputs = Object.keys(io).map(key => {
+      const values = key.split(",")
+      return [values[0], parseInt(values[1])]
+    })
+    const outputsToUs = Object.values(io).filter(value => value.length !== 0)
+    const outputsToThem = payload.map(payment => {
+      return [`1 ${POLICY_ID}.${payment.asset_name}`]
+    })
 
-  // Get a non-multi-asset transaction which has at least 3 ADA (to cover fees)
-  const result3 =
-    await client.query(`select tx.hash::text || '#' || tx_out.index as tx, value::int from tx_out
+    // Get a non-multi-asset transaction which has at least 3 ADA (to cover fees)
+    const result3 =
+      await client.query(`select tx.hash::text || '#' || tx_out.index as tx, value::int from tx_out
   inner join tx on tx_out.tx_id = tx.id
   left join tx_in on tx_out.tx_id = tx_in.tx_out_id and tx_out.index = tx_in.tx_out_index
   left join ma_tx_out on tx_out.id = ma_tx_out.tx_out_id
   where tx_in.tx_out_id is null and tx_out.address = '${ZOMBITS_ADDRESS}' and ma_tx_out.tx_out_id is null and value > 3000000 limit 1;`)
 
-  result3.rows.map(result => {
-    inputs.push([result.tx.substring(2), result.value])
-  })
+    result3.rows.map(result => {
+      inputs.push([result.tx.substring(2), result.value])
+    })
 
-  const inputsString = inputs.map(input => `--tx-in='${input[0]}'`).join(" ")
+    const inputsString = inputs.map(input => `--tx-in='${input[0]}'`).join(" ")
 
-  console.log("io:", io)
-  console.log("inputs:", inputs)
-  console.log("inputsString:", inputsString)
-  console.log("outputsToUs:", outputsToUs)
-  console.log("outputsToThem:", outputsToThem)
+    console.log("io:", io)
+    console.log("inputs:", inputs)
+    console.log("inputsString:", inputsString)
+    console.log("outputsToUs:", outputsToUs)
+    console.log("outputsToThem:", outputsToThem)
 
-  const totalInputAdaValue = inputs.reduce((prev, curr) => [
-    undefined,
-    prev[1] + curr[1],
-  ])[1]
+    const totalInputAdaValue = inputs.reduce((prev, curr) => [
+      undefined,
+      prev[1] + curr[1],
+    ])[1]
 
-  let totalMinValue = 0
-  const outputsToUsString = outputsToUs.map(output => {
-    const outputString = output.join(" + ")
+    let totalMinValue = 0
+    const outputsToUsString = outputsToUs.map(output => {
+      const outputString = output.join(" + ")
 
-    const minValue = parseInt(
-      execSync(
-        `cardano-cli transaction calculate-min-value --protocol-params-file=${PROTOCOL_PARAMS} --multi-asset='${outputString}'`
+      const minValue = parseInt(
+        execSync(
+          `cardano-cli transaction calculate-min-value --protocol-params-file=${PROTOCOL_PARAMS} --multi-asset='${outputString}'`
+        )
+          .toString()
+          .split(" ")[1]
       )
-        .toString()
-        .split(" ")[1]
-    )
-    totalMinValue += minValue
-    return `--tx-out='${ZOMBITS_ADDRESS} + ${minValue} lovelace + ${outputString}'`
-  })
-  const outputsToThemString = outputsToThem.map((output, i) => {
-    const outputString = output.join(" + ")
+      totalMinValue += minValue
+      return `--tx-out='${ZOMBITS_ADDRESS} + ${minValue} lovelace + ${outputString}'`
+    })
+    const outputsToThemString = outputsToThem.map((output, i) => {
+      const outputString = output.join(" + ")
 
-    const minValue = parseInt(
-      execSync(
-        `cardano-cli transaction calculate-min-value --protocol-params-file=${PROTOCOL_PARAMS} --multi-asset='${outputString}'`
+      const minValue = parseInt(
+        execSync(
+          `cardano-cli transaction calculate-min-value --protocol-params-file=${PROTOCOL_PARAMS} --multi-asset='${outputString}'`
+        )
+          .toString()
+          .split(" ")[1]
       )
-        .toString()
-        .split(" ")[1]
-    )
-    totalMinValue += minValue
-    return `--tx-out='${payload[i].sender_address} + ${minValue} lovelace + ${outputString}'`
-  })
+      totalMinValue += minValue
+      return `--tx-out='${payload[i].sender_address} + ${minValue} lovelace + ${outputString}'`
+    })
 
-  const txOutputsDraft = `${outputsToThemString.join(
-    " "
-  )} ${outputsToUsString.join(" ")} --tx-out='${ZOMBITS_ADDRESS}+0'`
+    const txOutputsDraft = `${outputsToThemString.join(
+      " "
+    )} ${outputsToUsString.join(" ")} --tx-out='${ZOMBITS_ADDRESS}+0'`
 
-  // console.log(outputsToUsString)
-  // console.log(outputsToThemString)
-  // console.log(totalMinValue)
+    // console.log(outputsToUsString)
+    // console.log(outputsToThemString)
+    // console.log(totalMinValue)
 
-  const PAYMENT_ID = uuid()
-  const TX_DRAFT_FILENAME = `cli/tx/${PAYMENT_ID}-tx-draft`
-  const TX_FINAL_FILENAME = `cli/tx/${PAYMENT_ID}-tx-final`
-  const TX_SIGNED_FILENAME = `cli/tx/${PAYMENT_ID}-tx-signed`
-  const SIGNING_KEY_FILE = "cli/keys/payment1.skey" // SIGNING KEY OF PAYMENT ADDRESS
+    const PAYMENT_ID = uuid()
+    const TX_DRAFT_FILENAME = `cli/tx/${PAYMENT_ID}-tx-draft`
+    const TX_FINAL_FILENAME = `cli/tx/${PAYMENT_ID}-tx-final`
+    const TX_SIGNED_FILENAME = `cli/tx/${PAYMENT_ID}-tx-signed`
+    const SIGNING_KEY_FILE = "cli/keys/payment1.skey" // SIGNING KEY OF PAYMENT ADDRESS
 
-  execSync(
-    `cardano-cli transaction build-raw ${inputsString} ${txOutputsDraft} --fee=0 --out-file=${TX_DRAFT_FILENAME}`
-  )
-  const fee = parseInt(
     execSync(
-      `cardano-cli transaction calculate-min-fee --tx-body-file=${TX_DRAFT_FILENAME} --tx-in-count=${
-        inputs.length
-      } --tx-out-count=${
-        outputsToThemString.length + outputsToUsString.length + 1
-      } --witness-count=1 --protocol-params-file=${PROTOCOL_PARAMS}`
+      `cardano-cli transaction build-raw ${inputsString} ${txOutputsDraft} --fee=0 --out-file=${TX_DRAFT_FILENAME}`
     )
-      .toString()
-      .split(" ")[0]
-  )
+    const fee = parseInt(
+      execSync(
+        `cardano-cli transaction calculate-min-fee --tx-body-file=${TX_DRAFT_FILENAME} --tx-in-count=${
+          inputs.length
+        } --tx-out-count=${
+          outputsToThemString.length + outputsToUsString.length + 1
+        } --witness-count=1 --protocol-params-file=${PROTOCOL_PARAMS}`
+      )
+        .toString()
+        .split(" ")[0]
+    )
 
-  const changeToUs = totalInputAdaValue - totalMinValue - fee
-  const txOutputsFinal = `${outputsToThemString.join(
-    " "
-  )} ${outputsToUsString.join(" ")} --tx-out='${ZOMBITS_ADDRESS}+${changeToUs}'`
+    const changeToUs = totalInputAdaValue - totalMinValue - fee
+    const txOutputsFinal = `${outputsToThemString.join(
+      " "
+    )} ${outputsToUsString.join(
+      " "
+    )} --tx-out='${ZOMBITS_ADDRESS}+${changeToUs}'`
 
-  execSync(
-    `cardano-cli transaction build-raw ${inputsString} ${txOutputsFinal} --fee=${fee} --out-file=${TX_FINAL_FILENAME}`
-  )
+    execSync(
+      `cardano-cli transaction build-raw ${inputsString} ${txOutputsFinal} --fee=${fee} --out-file=${TX_FINAL_FILENAME}`
+    )
 
-  console.log(
-    `cardano-cli transaction build-raw ${inputsString} ${txOutputsFinal} --fee=${fee} --out-file=${TX_FINAL_FILENAME}`
-  )
+    console.log(
+      `cardano-cli transaction build-raw ${inputsString} ${txOutputsFinal} --fee=${fee} --out-file=${TX_FINAL_FILENAME}`
+    )
 
-  execSync(
-    `cardano-cli transaction sign --tx-body-file=${TX_FINAL_FILENAME} --signing-key-file=${SIGNING_KEY_FILE} --out-file=${TX_SIGNED_FILENAME} && cardano-cli transaction submit --tx-file=${TX_SIGNED_FILENAME} --testnet-magic=1097911063`
-  )
+    execSync(
+      `cardano-cli transaction sign --tx-body-file=${TX_FINAL_FILENAME} --signing-key-file=${SIGNING_KEY_FILE} --out-file=${TX_SIGNED_FILENAME} && cardano-cli transaction submit --tx-file=${TX_SIGNED_FILENAME} --testnet-magic=1097911063`
+    )
+  } catch (err) {
+    console.log(err)
+    console.log({
+      error: "An error has occured while processing a valid payment.",
+    })
+  }
 }
 
 const processInvalidPayment = payload => {
-  // Refund payment Zombit (payload.amount) to payload.address
-  console.log("INVALID PAYMENT RECEIVED:", payload)
-  // Create input parts of CLI command
-  const txInputsFinal = payload
-    .map(
-      payment => `--tx-in=${payment.tx_hash.substring(2)}#${payment.tx_index}`
-    )
-    .join(" ")
+  try {
+    // Refund payment Zombit (payload.amount) to payload.address
+    console.log("INVALID PAYMENT RECEIVED:", payload)
+    // Create input parts of CLI command
+    const txInputsFinal = payload
+      .map(
+        payment => `--tx-in=${payment.tx_hash.substring(2)}#${payment.tx_index}`
+      )
+      .join(" ")
 
-  const txOutputsDraft = payload
-    .map(payment => `--tx-out=${payment.sender_address}+0`)
-    .join(" ")
+    const txOutputsDraft = payload
+      .map(payment => `--tx-out=${payment.sender_address}+0`)
+      .join(" ")
 
-  const REFUND_ID = uuid()
-  const TX_DRAFT_FILENAME = `cli/tx/${REFUND_ID}-tx-draft`
-  const TX_FINAL_FILENAME = `cli/tx/${REFUND_ID}-tx-final`
-  const TX_SIGNED_FILENAME = `cli/tx/${REFUND_ID}-tx-signed`
-  const SIGNING_KEY_FILE = "cli/keys/payment2.skey" // SIGNING KEY OF PAYMENT ADDRESS
+    const REFUND_ID = uuid()
+    const TX_DRAFT_FILENAME = `cli/tx/${REFUND_ID}-tx-draft`
+    const TX_FINAL_FILENAME = `cli/tx/${REFUND_ID}-tx-final`
+    const TX_SIGNED_FILENAME = `cli/tx/${REFUND_ID}-tx-signed`
+    const SIGNING_KEY_FILE = "cli/keys/payment2.skey" // SIGNING KEY OF PAYMENT ADDRESS
 
-  const buildDraftTxCommand = `cardano-cli transaction build-raw ${txInputsFinal} ${txOutputsDraft} --fee=0 --out-file=${TX_DRAFT_FILENAME}`
-  exec(buildDraftTxCommand, (error, stdout, stderr) => {
-    console.log(
-      `${REFUND_ID} Draft transaction created:`,
-      error,
-      stderr,
-      stdout
-    )
+    const buildDraftTxCommand = `cardano-cli transaction build-raw ${txInputsFinal} ${txOutputsDraft} --fee=0 --out-file=${TX_DRAFT_FILENAME}`
+    exec(buildDraftTxCommand, (error, stdout, stderr) => {
+      console.log(
+        `${REFUND_ID} Draft transaction created:`,
+        error,
+        stderr,
+        stdout
+      )
 
-    const calculateMinFeeCommand = `cardano-cli transaction calculate-min-fee --tx-body-file=${TX_DRAFT_FILENAME} --tx-in-count=${payload.length} --tx-out-count=${payload.length} --witness-count=1 --protocol-params-file=${PROTOCOL_PARAMS}`
-    exec(calculateMinFeeCommand, (error, stdout, stderr) => {
-      console.log(`${REFUND_ID} Minimum fee calculated:`, error, stderr, stdout)
-
-      const fee = parseInt(stdout.split(" ")[0])
-      const splitFee = Math.floor(fee / payload.length)
-      const remainderFee = splitFee + (fee % payload.length)
-
-      const txOutputsFinal = payload
-        .map((payment, i) => {
-          if (i === payload.length - 1) {
-            return `--tx-out=${payment.sender_address}+${
-              payment.amount - remainderFee
-            }`
-          }
-          return `--tx-out=${payment.sender_address}+${
-            payment.amount - splitFee
-          }`
-        })
-        .join(" ")
-      const buildFinalTxCommand = `cardano-cli transaction build-raw ${txInputsFinal} ${txOutputsFinal} --fee=${fee} --out-file=${TX_FINAL_FILENAME}`
-      console.log(buildFinalTxCommand)
-      exec(buildFinalTxCommand, (error, stdout, stderr) => {
+      const calculateMinFeeCommand = `cardano-cli transaction calculate-min-fee --tx-body-file=${TX_DRAFT_FILENAME} --tx-in-count=${payload.length} --tx-out-count=${payload.length} --witness-count=1 --protocol-params-file=${PROTOCOL_PARAMS}`
+      exec(calculateMinFeeCommand, (error, stdout, stderr) => {
         console.log(
-          `${REFUND_ID} Final transaction created:`,
+          `${REFUND_ID} Minimum fee calculated:`,
           error,
           stderr,
           stdout
         )
 
-        const signTxCommand = `cardano-cli transaction sign --tx-body-file=${TX_FINAL_FILENAME} --signing-key-file=${SIGNING_KEY_FILE} --out-file=${TX_SIGNED_FILENAME} && cardano-cli transaction submit --tx-file=${TX_SIGNED_FILENAME} --testnet-magic=1097911063`
-        exec(signTxCommand, (error, stdout, stderr) => {
+        const fee = parseInt(stdout.split(" ")[0])
+        const splitFee = Math.floor(fee / payload.length)
+        const remainderFee = splitFee + (fee % payload.length)
+
+        const txOutputsFinal = payload
+          .map((payment, i) => {
+            if (i === payload.length - 1) {
+              return `--tx-out=${payment.sender_address}+${
+                payment.amount - remainderFee
+              }`
+            }
+            return `--tx-out=${payment.sender_address}+${
+              payment.amount - splitFee
+            }`
+          })
+          .join(" ")
+        const buildFinalTxCommand = `cardano-cli transaction build-raw ${txInputsFinal} ${txOutputsFinal} --fee=${fee} --out-file=${TX_FINAL_FILENAME}`
+        console.log(buildFinalTxCommand)
+        exec(buildFinalTxCommand, (error, stdout, stderr) => {
           console.log(
-            `${REFUND_ID} Final transaction signed and submitted:`,
+            `${REFUND_ID} Final transaction created:`,
             error,
             stderr,
             stdout
           )
+
+          const signTxCommand = `cardano-cli transaction sign --tx-body-file=${TX_FINAL_FILENAME} --signing-key-file=${SIGNING_KEY_FILE} --out-file=${TX_SIGNED_FILENAME} && cardano-cli transaction submit --tx-file=${TX_SIGNED_FILENAME} --testnet-magic=1097911063`
+          exec(signTxCommand, (error, stdout, stderr) => {
+            console.log(
+              `${REFUND_ID} Final transaction signed and submitted:`,
+              error,
+              stderr,
+              stdout
+            )
+          })
         })
       })
     })
-  })
+  } catch (err) {
+    console.log(err)
+    console.log({
+      error: "An error has occured while processing a valid payment.",
+    })
+  }
 }
 
 app.post("/api/reservations", async (req, res) => {
-  const result = await client.query(RESERVE_QUERY)
-  if (result.rowCount == 0) {
-    res.status(503).send({ error: "No Zombits are available." })
-  } else {
-    res.status(201).send({
-      price: result.rows[0].price,
-      paymentAddress: PAYMENT_ADDRESS,
-      expiresAt: result.rows[0].expires_at,
-    })
+  try {
+    const result = await client.query(RESERVE_QUERY)
+    if (result.rowCount == 0) {
+      res.status(503).send({ error: "No Zombits are available." })
+    } else {
+      res.status(201).send({
+        price: result.rows[0].price,
+        paymentAddress: PAYMENT_ADDRESS,
+        expiresAt: result.rows[0].expires_at,
+      })
+    }
+  } catch (err) {
+    console.log(err)
+    res
+      .status(500)
+      .send({ error: "An error has occured while making a reservation." })
   }
 })
 
 app.get("/api/reservations/:price", async (req, res) => {
-  if (isNaN(parseInt(req.params.price))) {
-    res.status(404).send({ error: "Zombit not sold." })
-    return
-  }
-  const result = await client.query(
-    `select encode(asset_name, 'escape') as asset_name from zombits_reservations as asset_name where price = $1 and sold is true`,
-    [parseInt(req.params.price)]
-  )
-  if (result.rowCount == 0) {
-    res.status(404).send({ error: "Zombit not sold." })
-  } else {
-    res.status(200).send({
-      assetName: result.rows[0].asset_name,
-    })
+  try {
+    if (isNaN(parseInt(req.params.price))) {
+      res.status(404).send({ error: "Zombit not sold." })
+      return
+    }
+    const result = await client.query(
+      `select encode(asset_name, 'escape') as asset_name from zombits_reservations as asset_name where price = $1 and sold is true`,
+      [parseInt(req.params.price)]
+    )
+    if (result.rowCount == 0) {
+      res.status(404).send({ error: "Zombit not sold." })
+    } else {
+      res.status(200).send({
+        assetName: result.rows[0].asset_name,
+      })
+    }
+  } catch (err) {
+    console.log(err)
+    res
+      .status(500)
+      .send({ error: "An error has occured while checking a reservation." })
   }
 })
 
