@@ -3,40 +3,58 @@
 ## Prerequisites
 
 Need 2 addresses:
-1. Receives payments: `addr_test1vr3jr8rjt47ah4spvhjm3jkq9gn65657thvsn64jvxtaatgx6pgwf`
-2. Contains and sends assets: `addr_test1vpjhck8puveya5qgd4uxe4arjzahxf4c2rkkstvt38c285q40majy`
 
-## Setup .env
+1. Receives payments: `addr1v9w53uk45fa6h9ufjw8as235pa0n0h5j7n3d7mrfmduxjxseq4u4s`
+2. Contains and sends assets: `addr1v8hzad0cqqxmklk9ckea0sxmfgzpul2anmypacycvh6l3hsstd0rs`
 
-```
-PGDATABASE=testnet
-CARDANO_NODE_SOCKET_PATH=cardano-node/state-node-testnet/node.socket
-```
+## Setup `cardano-node`
 
-## Setup Cardano Node
+1. Download the Linux executabble from https://github.com/input-output-hk/cardano-node
+1. Unzip it
+1. Rename the resulting folder to `cardano-node`
 
-### Clone Cardano Node
+## Setup `cardano-db-sync`
 
-### 
-
-### Start Cardano Node
+### Clone repository
 
 ```
-./testnet-node-local/bin/cardano-node-testnet
+git clone https://github.com/input-output-hk/cardano-db-sync.git
 ```
 
-## Setup Cardano DB Sync
-
-### Start Cardano DB Sync
+### Build
 
 ```
-PGPASSFILE=config/pgpass-testnet db-sync-node/bin/cardano-db-sync --schema-dir schema --socket-path ../cardano-node/state-node-testnet/node.socket --state-dir ledger-state/testnet --config config/testnet-config\ 2.json
+cd cardano-db-sync
+git checkout 10.0.0
+nix-build -A cardano-db-sync -o db-sync-node
+```
+
+## Run `cardano-node`
+
+Run `cardano-node`:
+
+```
+pm2 start ecosystem.config.js --only cardano-node
+```
+
+Wait for sync to finish
+
+### Create `cexplorer` database
+
+```
+PGPASSFILE=config/pgpass-mainnet scripts/postgresql-setup.sh --createdb
+```
+
+## Run `cardano-db-sync` and `app.js`
+
+```
+pm2 start ecosystem.config.js
 ```
 
 ### Run the postgresql client
 
 ```
-PGPASSFILE=config/pgpass-testnet psql testnet
+psql cexplorer
 ```
 
 ### Create Zombits table
@@ -65,7 +83,7 @@ insert into zombits_reservations (asset_name)
 ```sql
 create or replace function notify_block_payments_received() returns trigger as $$
   declare
-    payment_address character varying := 'addr_test1vr3jr8rjt47ah4spvhjm3jkq9gn65657thvsn64jvxtaatgx6pgwf';
+    payment_address character varying := 'addr1v9w53uk45fa6h9ufjw8as235pa0n0h5j7n3d7mrfmduxjxseq4u4s';
     valid_payments json;
     invalid_payments json;
   begin

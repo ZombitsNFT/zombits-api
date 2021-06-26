@@ -4,8 +4,6 @@ const { exec, execSync } = require("child_process")
 const express = require("express")
 const { v4: uuid } = require("uuid")
 
-console.log("HI")
-
 const app = express()
 const client = new Client()
 client.connect()
@@ -15,10 +13,10 @@ const SERVER_PORT = 3000
 const RESERVATION_DURATION = "10 minutes"
 
 const PAYMENT_ADDRESS = // Address that should receive payments
-  "addr_test1vr3jr8rjt47ah4spvhjm3jkq9gn65657thvsn64jvxtaatgx6pgwf"
+  "addr1v9w53uk45fa6h9ufjw8as235pa0n0h5j7n3d7mrfmduxjxseq4u4s"
 const ZOMBITS_ADDRESS = // Address that should have the Zombits
-  "addr_test1vpjhck8puveya5qgd4uxe4arjzahxf4c2rkkstvt38c285q40majy"
-const POLICY_ID = "adc4bbfea97697b5b7560a059d130b182dc4a5dfaef24dfd3e01a7a4" // Policy ID of Zombits
+  "addr1v8hzad0cqqxmklk9ckea0sxmfgzpul2anmypacycvh6l3hsstd0rs"
+const POLICY_ID = "ad6290066292cfeef7376cd575e5d8367833ab3d8b2ac53d26ae4ecc" // Policy ID of Zombits
 const PROTOCOL_PARAMS = "cli/protocol.json"
 
 const RESERVE_QUERY = {
@@ -99,7 +97,7 @@ const processValidPayment = async payload => {
   inner join tx on tx.id = tx_out.tx_id
   inner join ma_tx_out on tx_out.id = ma_tx_out.tx_out_id
   left join tx_in on tx_out.tx_id = tx_in.tx_out_id and tx_out.index = tx_in.tx_out_index
-  where tx_in.tx_out_id is null and tx_out.address = 'addr_test1vpjhck8puveya5qgd4uxe4arjzahxf4c2rkkstvt38c285q40majy' and (${param2}) and policy = '\\x${POLICY_ID}';`)
+  where tx_in.tx_out_id is null and tx_out.address = 'addr1v8hzad0cqqxmklk9ckea0sxmfgzpul2anmypacycvh6l3hsstd0rs' and (${param2}) and policy = '\\x${POLICY_ID}';`)
     result2.rows.forEach(row => {
       const key = `${row.tx.substring(2)},${row.value}`
       if (!Object.keys(io).includes(key)) {
@@ -147,7 +145,7 @@ const processValidPayment = async payload => {
 
       const minValue = parseInt(
         execSync(
-          `cardano-cli transaction calculate-min-value --protocol-params-file=${PROTOCOL_PARAMS} --multi-asset='${outputString}'`
+          `./cardano-node/cardano-cli transaction calculate-min-value --protocol-params-file=${PROTOCOL_PARAMS} --multi-asset='${outputString}'`
         )
           .toString()
           .split(" ")[1]
@@ -160,7 +158,7 @@ const processValidPayment = async payload => {
 
       const minValue = parseInt(
         execSync(
-          `cardano-cli transaction calculate-min-value --protocol-params-file=${PROTOCOL_PARAMS} --multi-asset='${outputString}'`
+          `./cardano-node/cardano-cli transaction calculate-min-value --protocol-params-file=${PROTOCOL_PARAMS} --multi-asset='${outputString}'`
         )
           .toString()
           .split(" ")[1]
@@ -181,14 +179,14 @@ const processValidPayment = async payload => {
     const TX_DRAFT_FILENAME = `cli/tx/${PAYMENT_ID}-tx-draft`
     const TX_FINAL_FILENAME = `cli/tx/${PAYMENT_ID}-tx-final`
     const TX_SIGNED_FILENAME = `cli/tx/${PAYMENT_ID}-tx-signed`
-    const SIGNING_KEY_FILE = "cli/keys/payment1.skey" // SIGNING KEY OF PAYMENT ADDRESS
+    const SIGNING_KEY_FILE = "cli/keys/zombits.skey" // SIGNING KEY OF ZOMBITS ADDRESS
 
     execSync(
-      `cardano-cli transaction build-raw ${inputsString} ${txOutputsDraft} --fee=0 --out-file=${TX_DRAFT_FILENAME}`
+      `./cardano-node/cardano-cli transaction build-raw ${inputsString} ${txOutputsDraft} --fee=0 --out-file=${TX_DRAFT_FILENAME}`
     )
     const fee = parseInt(
       execSync(
-        `cardano-cli transaction calculate-min-fee --tx-body-file=${TX_DRAFT_FILENAME} --tx-in-count=${
+        `./cardano-node/cardano-cli transaction calculate-min-fee --tx-body-file=${TX_DRAFT_FILENAME} --tx-in-count=${
           inputs.length
         } --tx-out-count=${
           outputsToThemString.length + outputsToUsString.length + 1
@@ -206,15 +204,15 @@ const processValidPayment = async payload => {
     )} --tx-out='${ZOMBITS_ADDRESS}+${changeToUs}'`
 
     execSync(
-      `cardano-cli transaction build-raw ${inputsString} ${txOutputsFinal} --fee=${fee} --out-file=${TX_FINAL_FILENAME}`
+      `./cardano-node/cardano-cli transaction build-raw ${inputsString} ${txOutputsFinal} --fee=${fee} --out-file=${TX_FINAL_FILENAME}`
     )
 
     console.log(
-      `cardano-cli transaction build-raw ${inputsString} ${txOutputsFinal} --fee=${fee} --out-file=${TX_FINAL_FILENAME}`
+      `./cardano-node/cardano-cli transaction build-raw ${inputsString} ${txOutputsFinal} --fee=${fee} --out-file=${TX_FINAL_FILENAME}`
     )
 
     execSync(
-      `cardano-cli transaction sign --tx-body-file=${TX_FINAL_FILENAME} --signing-key-file=${SIGNING_KEY_FILE} --out-file=${TX_SIGNED_FILENAME} && cardano-cli transaction submit --tx-file=${TX_SIGNED_FILENAME} --testnet-magic=1097911063`
+      `./cardano-node/cardano-cli transaction sign --tx-body-file=${TX_FINAL_FILENAME} --signing-key-file=${SIGNING_KEY_FILE} --out-file=${TX_SIGNED_FILENAME} && ./cardano-node/cardano-cli transaction submit --tx-file=${TX_SIGNED_FILENAME} --mainnet`
     )
   } catch (err) {
     console.log(err)
@@ -243,9 +241,9 @@ const processInvalidPayment = payload => {
     const TX_DRAFT_FILENAME = `cli/tx/${REFUND_ID}-tx-draft`
     const TX_FINAL_FILENAME = `cli/tx/${REFUND_ID}-tx-final`
     const TX_SIGNED_FILENAME = `cli/tx/${REFUND_ID}-tx-signed`
-    const SIGNING_KEY_FILE = "cli/keys/payment2.skey" // SIGNING KEY OF PAYMENT ADDRESS
+    const SIGNING_KEY_FILE = "cli/keys/payment.skey" // SIGNING KEY OF PAYMENT ADDRESS
 
-    const buildDraftTxCommand = `cardano-cli transaction build-raw ${txInputsFinal} ${txOutputsDraft} --fee=0 --out-file=${TX_DRAFT_FILENAME}`
+    const buildDraftTxCommand = `./cardano-node/cardano-cli transaction build-raw ${txInputsFinal} ${txOutputsDraft} --fee=0 --out-file=${TX_DRAFT_FILENAME}`
     exec(buildDraftTxCommand, (error, stdout, stderr) => {
       console.log(
         `${REFUND_ID} Draft transaction created:`,
@@ -254,7 +252,7 @@ const processInvalidPayment = payload => {
         stdout
       )
 
-      const calculateMinFeeCommand = `cardano-cli transaction calculate-min-fee --tx-body-file=${TX_DRAFT_FILENAME} --tx-in-count=${payload.length} --tx-out-count=${payload.length} --witness-count=1 --protocol-params-file=${PROTOCOL_PARAMS}`
+      const calculateMinFeeCommand = `./cardano-node/cardano-cli transaction calculate-min-fee --tx-body-file=${TX_DRAFT_FILENAME} --tx-in-count=${payload.length} --tx-out-count=${payload.length} --witness-count=1 --protocol-params-file=${PROTOCOL_PARAMS}`
       exec(calculateMinFeeCommand, (error, stdout, stderr) => {
         console.log(
           `${REFUND_ID} Minimum fee calculated:`,
@@ -279,7 +277,7 @@ const processInvalidPayment = payload => {
             }`
           })
           .join(" ")
-        const buildFinalTxCommand = `cardano-cli transaction build-raw ${txInputsFinal} ${txOutputsFinal} --fee=${fee} --out-file=${TX_FINAL_FILENAME}`
+        const buildFinalTxCommand = `./cardano-node/cardano-cli transaction build-raw ${txInputsFinal} ${txOutputsFinal} --fee=${fee} --out-file=${TX_FINAL_FILENAME}`
         console.log(buildFinalTxCommand)
         exec(buildFinalTxCommand, (error, stdout, stderr) => {
           console.log(
@@ -289,7 +287,7 @@ const processInvalidPayment = payload => {
             stdout
           )
 
-          const signTxCommand = `cardano-cli transaction sign --tx-body-file=${TX_FINAL_FILENAME} --signing-key-file=${SIGNING_KEY_FILE} --out-file=${TX_SIGNED_FILENAME} && cardano-cli transaction submit --tx-file=${TX_SIGNED_FILENAME} --testnet-magic=1097911063`
+          const signTxCommand = `./cardano-node/cardano-cli transaction sign --tx-body-file=${TX_FINAL_FILENAME} --signing-key-file=${SIGNING_KEY_FILE} --out-file=${TX_SIGNED_FILENAME} && ./cardano-node/cardano-cli transaction submit --tx-file=${TX_SIGNED_FILENAME} --mainnet`
           exec(signTxCommand, (error, stdout, stderr) => {
             console.log(
               `${REFUND_ID} Final transaction signed and submitted:`,
@@ -354,67 +352,67 @@ app.get("/api/reservations/:price", async (req, res) => {
   }
 })
 
-app.post("/api/tests/valid", async (req, res) => {
-  const payload = [
-    {
-      sender_address:
-        "addr_test1vru2t5fnk24nnythutt8hjmg5hnku5yz2hhesf2vkkph0eq9gt5v7",
-      asset_name: "Zombit5",
-    },
-    {
-      sender_address:
-        "addr_test1vru2t5fnk24nnythutt8hjmg5hnku5yz2hhesf2vkkph0eq9gt5v7",
-      asset_name: "Zombit25",
-    },
-  ]
-  processValidPayment(payload)
-})
+// app.post("/api/tests/valid", async (req, res) => {
+//   const payload = [
+//     {
+//       sender_address:
+//         "addr_test1vru2t5fnk24nnythutt8hjmg5hnku5yz2hhesf2vkkph0eq9gt5v7",
+//       asset_name: "Zombit5",
+//     },
+//     {
+//       sender_address:
+//         "addr_test1vru2t5fnk24nnythutt8hjmg5hnku5yz2hhesf2vkkph0eq9gt5v7",
+//       asset_name: "Zombit25",
+//     },
+//   ]
+//   processValidPayment(payload)
+// })
 
-app.post("/api/tests/invalid", async (req, res) => {
-  const payload = [
-    {
-      sender_address:
-        "addr_test1vpjhck8puveya5qgd4uxe4arjzahxf4c2rkkstvt38c285q40majy",
-      amount: 10834201,
-      tx_hash:
-        "\\x5cd03dc0cb52edb18ed59e569f8ef2dfc562952f983551b664c682d2caed2c6b",
-      tx_index: 1,
-    },
-    {
-      sender_address:
-        "addr_test1vpjhck8puveya5qgd4uxe4arjzahxf4c2rkkstvt38c285q40majy",
-      amount: 6969696,
-      tx_hash:
-        "\\xabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcd",
-      tx_index: 0,
-    },
-    {
-      sender_address:
-        "addr_test1vpjhck8puveya5qgd4uxe4arjzahxf4c2rkkstvt38c285q40majy",
-      amount: 6969696,
-      tx_hash:
-        "\\xabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcd",
-      tx_index: 0,
-    },
-    {
-      sender_address:
-        "addr_test1vpjhck8puveya5qgd4uxe4arjzahxf4c2rkkstvt38c285q40majy",
-      amount: 6969696,
-      tx_hash:
-        "\\xabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcd",
-      tx_index: 0,
-    },
-    {
-      sender_address:
-        "addr_test1vpjhck8puveya5qgd4uxe4arjzahxf4c2rkkstvt38c285q40majy",
-      amount: 6969696,
-      tx_hash:
-        "\\xabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcd",
-      tx_index: 0,
-    },
-  ]
-  processInvalidPayment(payload)
-})
+// app.post("/api/tests/invalid", async (req, res) => {
+//   const payload = [
+//     {
+//       sender_address:
+//         "addr1v8hzad0cqqxmklk9ckea0sxmfgzpul2anmypacycvh6l3hsstd0rs",
+//       amount: 10834201,
+//       tx_hash:
+//         "\\x5cd03dc0cb52edb18ed59e569f8ef2dfc562952f983551b664c682d2caed2c6b",
+//       tx_index: 1,
+//     },
+//     {
+//       sender_address:
+//         "addr1v8hzad0cqqxmklk9ckea0sxmfgzpul2anmypacycvh6l3hsstd0rs",
+//       amount: 6969696,
+//       tx_hash:
+//         "\\xabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcd",
+//       tx_index: 0,
+//     },
+//     {
+//       sender_address:
+//         "addr1v8hzad0cqqxmklk9ckea0sxmfgzpul2anmypacycvh6l3hsstd0rs",
+//       amount: 6969696,
+//       tx_hash:
+//         "\\xabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcd",
+//       tx_index: 0,
+//     },
+//     {
+//       sender_address:
+//         "addr1v8hzad0cqqxmklk9ckea0sxmfgzpul2anmypacycvh6l3hsstd0rs",
+//       amount: 6969696,
+//       tx_hash:
+//         "\\xabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcd",
+//       tx_index: 0,
+//     },
+//     {
+//       sender_address:
+//         "addr1v8hzad0cqqxmklk9ckea0sxmfgzpul2anmypacycvh6l3hsstd0rs",
+//       amount: 6969696,
+//       tx_hash:
+//         "\\xabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcd",
+//       tx_index: 0,
+//     },
+//   ]
+//   processInvalidPayment(payload)
+// })
 
 app.listen(SERVER_PORT, () =>
   console.log(`Listening on port ${SERVER_PORT}...`)
