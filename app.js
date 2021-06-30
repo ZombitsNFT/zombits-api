@@ -334,7 +334,7 @@ app.get("/api/reservations/:price", async (req, res) => {
       return
     }
     const result = await client.query(
-      `select encode(asset_name, 'escape') as asset_name from zombits_reservations as asset_name where price = $1 and sold is true`,
+      `select encode(asset_name, 'escape') as asset_name, rarity from zombits_reservations as asset_name where price = $1 and sold is true`,
       [parseInt(req.params.price)]
     )
     if (result.rowCount == 0) {
@@ -342,6 +342,7 @@ app.get("/api/reservations/:price", async (req, res) => {
     } else {
       res.status(200).send({
         assetName: result.rows[0].asset_name,
+        rarity: result.rows[0].rarity,
       })
     }
   } catch (err) {
