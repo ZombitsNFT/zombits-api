@@ -307,7 +307,7 @@ const processInvalidPayment = payload => {
   }
 }
 
-app.post("/api/reservations", async (req, res) => {
+app.post("/reservations", async (req, res) => {
   try {
     const result = await client.query(RESERVE_QUERY)
     if (result.rowCount == 0) {
@@ -327,7 +327,7 @@ app.post("/api/reservations", async (req, res) => {
   }
 })
 
-app.get("/api/reservations/:price", async (req, res) => {
+app.get("/reservations/:price", async (req, res) => {
   try {
     if (isNaN(parseInt(req.params.price))) {
       res.status(404).send({ error: "Zombit not sold." })
@@ -353,7 +353,7 @@ app.get("/api/reservations/:price", async (req, res) => {
   }
 })
 
-app.get("/api/zombits/common/count", async (req, res) => {
+app.get("/reservations/common/count", async (req, res) => {
   try {
     const result = await client.query(
       `select count(*) from zombits_reservations where rarity = 'Common' and sold is false;`
@@ -367,7 +367,7 @@ app.get("/api/zombits/common/count", async (req, res) => {
   }
 })
 
-app.get("/api/zombits/uncommon/count", async (req, res) => {
+app.get("/reservations/uncommon/count", async (req, res) => {
   try {
     const result = await client.query(
       `select count(*) from zombits_reservations where rarity = 'Uncommon' and sold is false;`
@@ -381,7 +381,7 @@ app.get("/api/zombits/uncommon/count", async (req, res) => {
   }
 })
 
-app.get("/api/zombits/rare/count", async (req, res) => {
+app.get("/reservations/rare/count", async (req, res) => {
   try {
     const result = await client.query(
       `select count(*) from zombits_reservations where rarity = 'Rare' and sold is false;`
@@ -395,7 +395,7 @@ app.get("/api/zombits/rare/count", async (req, res) => {
   }
 })
 
-app.get("/api/zombits/epic/count", async (req, res) => {
+app.get("/reservations/epic/count", async (req, res) => {
   try {
     const result = await client.query(
       `select count(*) from zombits_reservations where rarity = 'Epic' and sold is false;`
@@ -409,7 +409,7 @@ app.get("/api/zombits/epic/count", async (req, res) => {
   }
 })
 
-app.get("/api/zombits/legendary/count", async (req, res) => {
+app.get("/reservations/legendary/count", async (req, res) => {
   try {
     const result = await client.query(
       `select count(*) from zombits_reservations where rarity = 'Legendary' and sold is false;`
@@ -423,7 +423,7 @@ app.get("/api/zombits/legendary/count", async (req, res) => {
   }
 })
 
-app.get("/api/zombits/theonlyone/count", async (req, res) => {
+app.get("/reservations/theonlyone/count", async (req, res) => {
   try {
     const result = await client.query(
       `select count(*) from zombits_reservations where rarity = 'The Only One' and sold is false;`
