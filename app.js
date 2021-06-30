@@ -352,67 +352,89 @@ app.get("/api/reservations/:price", async (req, res) => {
   }
 })
 
-// app.post("/api/tests/valid", async (req, res) => {
-//   const payload = [
-//     {
-//       sender_address:
-//         "addr_test1vru2t5fnk24nnythutt8hjmg5hnku5yz2hhesf2vkkph0eq9gt5v7",
-//       asset_name: "Zombit5",
-//     },
-//     {
-//       sender_address:
-//         "addr_test1vru2t5fnk24nnythutt8hjmg5hnku5yz2hhesf2vkkph0eq9gt5v7",
-//       asset_name: "Zombit25",
-//     },
-//   ]
-//   processValidPayment(payload)
-// })
+app.get("/api/zombits/common/count", async (req, res) => {
+  try {
+    const result = await client.query(
+      `select count(*) from zombits_reservations where rarity = 'Common' and sold is false;`
+    )
+    res.status(200).send({ common: parseInt(result.rows[0].count) })
+  } catch (err) {
+    console.log(err)
+    res.status(500).send({
+      error: "An error has occured while getting Common Zombits count.",
+    })
+  }
+})
 
-// app.post("/api/tests/invalid", async (req, res) => {
-//   const payload = [
-//     {
-//       sender_address:
-//         "addr1v8hzad0cqqxmklk9ckea0sxmfgzpul2anmypacycvh6l3hsstd0rs",
-//       amount: 10834201,
-//       tx_hash:
-//         "\\x5cd03dc0cb52edb18ed59e569f8ef2dfc562952f983551b664c682d2caed2c6b",
-//       tx_index: 1,
-//     },
-//     {
-//       sender_address:
-//         "addr1v8hzad0cqqxmklk9ckea0sxmfgzpul2anmypacycvh6l3hsstd0rs",
-//       amount: 6969696,
-//       tx_hash:
-//         "\\xabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcd",
-//       tx_index: 0,
-//     },
-//     {
-//       sender_address:
-//         "addr1v8hzad0cqqxmklk9ckea0sxmfgzpul2anmypacycvh6l3hsstd0rs",
-//       amount: 6969696,
-//       tx_hash:
-//         "\\xabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcd",
-//       tx_index: 0,
-//     },
-//     {
-//       sender_address:
-//         "addr1v8hzad0cqqxmklk9ckea0sxmfgzpul2anmypacycvh6l3hsstd0rs",
-//       amount: 6969696,
-//       tx_hash:
-//         "\\xabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcd",
-//       tx_index: 0,
-//     },
-//     {
-//       sender_address:
-//         "addr1v8hzad0cqqxmklk9ckea0sxmfgzpul2anmypacycvh6l3hsstd0rs",
-//       amount: 6969696,
-//       tx_hash:
-//         "\\xabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcd",
-//       tx_index: 0,
-//     },
-//   ]
-//   processInvalidPayment(payload)
-// })
+app.get("/api/zombits/uncommon/count", async (req, res) => {
+  try {
+    const result = await client.query(
+      `select count(*) from zombits_reservations where rarity = 'Uncommon' and sold is false;`
+    )
+    res.status(200).send({ uncommon: parseInt(result.rows[0].count) })
+  } catch (err) {
+    console.log(err)
+    res.status(500).send({
+      error: "An error has occured while getting Uncommon Zombits count.",
+    })
+  }
+})
+
+app.get("/api/zombits/rare/count", async (req, res) => {
+  try {
+    const result = await client.query(
+      `select count(*) from zombits_reservations where rarity = 'Rare' and sold is false;`
+    )
+    res.status(200).send({ rare: parseInt(result.rows[0].count) })
+  } catch (err) {
+    console.log(err)
+    res.status(500).send({
+      error: "An error has occured while getting Rare Zombits count.",
+    })
+  }
+})
+
+app.get("/api/zombits/epic/count", async (req, res) => {
+  try {
+    const result = await client.query(
+      `select count(*) from zombits_reservations where rarity = 'Epic' and sold is false;`
+    )
+    res.status(200).send({ epic: parseInt(result.rows[0].count) })
+  } catch (err) {
+    console.log(err)
+    res.status(500).send({
+      error: "An error has occured while getting Epic Zombits count.",
+    })
+  }
+})
+
+app.get("/api/zombits/legendary/count", async (req, res) => {
+  try {
+    const result = await client.query(
+      `select count(*) from zombits_reservations where rarity = 'Legendary' and sold is false;`
+    )
+    res.status(200).send({ legendary: parseInt(result.rows[0].count) })
+  } catch (err) {
+    console.log(err)
+    res.status(500).send({
+      error: "An error has occured while getting Legendary Zombits count.",
+    })
+  }
+})
+
+app.get("/api/zombits/theonlyone/count", async (req, res) => {
+  try {
+    const result = await client.query(
+      `select count(*) from zombits_reservations where rarity = 'The Only One' and sold is false;`
+    )
+    res.status(200).send({ theOnlyOne: parseInt(result.rows[0].count) })
+  } catch (err) {
+    console.log(err)
+    res.status(500).send({
+      error: "An error has occured while getting The Only One Zombits count.",
+    })
+  }
+})
 
 app.listen(SERVER_PORT, () =>
   console.log(`Listening on port ${SERVER_PORT}...`)

@@ -1,48 +1,54 @@
-# zombits-api
+# Zombits Server and API Setup
+
+## Requirements
+
+- Linux machine with at least 16GB RAM, 80GB storage
 
 ## Prerequisites
 
-Create two keypairs and addresses.
-
-1. One for receiving payments: `addr1v9w53uk45fa6h9ufjw8as235pa0n0h5j7n3d7mrfmduxjxseq4u4s`
-2. One for holding and sending Zombits: `addr1v8hzad0cqqxmklk9ckea0sxmfgzpul2anmypacycvh6l3hsstd0rs`
+1. Create two keypairs and addresses.
+   - One for receiving payments: `addr1v9w53uk45fa6h9ufjw8as235pa0n0h5j7n3d7mrfmduxjxseq4u4s`
+   - One for holding and sending Zombits: `addr1v8hzad0cqqxmklk9ckea0sxmfgzpul2anmypacycvh6l3hsstd0rs`
+2. Install `pm2`
+   ```bash
+   npm install -g pm2
+   ```
 
 ## Build and run `cardano-node`
 
-1. Download the Linux executabble from https://github.com/input-output-hk/cardano-node
-2. Unzip it
-3. Rename the resulting folder to `cardano-node`
-4. Run cardano-node
-   ```
+1. Download and unzip the latest hydra binary from https://github.com/input-output-hk/cardano-node/releases
+2. Rename the resulting folder to `cardano-node`
+3. Run cardano-node
+   ```bash
    pm2 start ecosystem.config.js --only cardano-node
    ```
-5. Wait for sync to finish
+4. Wait for sync to finish
 
 ## Build and run `cardano-db-sync`
 
 1. Install nix
-    ```
-    curl -L https://nixos.org/nix/install > install-nix.sh
-    chmod +x install-nix.sh
-    ./install-nix.sh
-    rm install-nix.sh
-    ```
-2. Clone the Git repository
+   ```bash
+   curl -L https://nixos.org/nix/install > install-nix.sh
+   chmod +x install-nix.sh
+   ./install-nix.sh
+   rm install-nix.sh
    ```
+2. Clone the Git repository
+   ```bash
    git clone https://github.com/input-output-hk/cardano-db-sync.git
    ```
-3. Build version 10.0.0 using nix
-   ```
+3. Build latest release using nix
+   ```bash
    cd cardano-db-sync
-   git checkout 10.0.0
+   git checkout 9.0.0 # latest release
    nix-build -A cardano-db-sync -o db-sync-node
    ```
 4. Setup Cardano database
-   ```
+   ```bash
    PGPASSFILE=config/pgpass-mainnet scripts/postgresql-setup.sh --createdb
    ```
 5. Run cardano-db-sync
-   ```
+   ```bash
    pm2 start ecosystem.config.js --only cardano-db-sync
    ```
 6. Wait for sync to finish
@@ -50,7 +56,7 @@ Create two keypairs and addresses.
 ## Configure database for Zombits
 
 1. Run the Postgres client for the `cexplorer` database
-   ```
+   ```bash
    psql cexplorer
    ```
 2. Creaste Zombits table
@@ -58,16 +64,17 @@ Create two keypairs and addresses.
    create table if not exists zombits_reservations (
      price numeric primary key default 10000000 + floor(random() * 1000000),
      asset_name bytea unique not null,
+     rarity character varying not null,
      sold boolean default false,
      expires_at timestamp
    );
    ```
 3. Populate Zombits table
    ```sql
-   insert into zombits_reservations (asset_name)
-     values ('Zombit1');
-   insert into zombits_reservations (asset_name)
-     values ('Zombit2');
+   insert into zombits_reservations (asset_name, rarity)
+     values ('Zombit1', 'Common');
+   insert into zombits_reservations (asset_name, rarity)
+     values ('Zombit2', 'Common);
    ...
    ```
 4. Create notification function
