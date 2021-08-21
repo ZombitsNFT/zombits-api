@@ -2,9 +2,11 @@ require("dotenv").config()
 const { Client } = require("pg")
 const { exec, execSync } = require("child_process")
 const express = require("express")
+const cors = require("cors")
 const { v4: uuid } = require("uuid")
 
 const app = express()
+app.use(cors())
 const client = new Client()
 client.connect()
 
